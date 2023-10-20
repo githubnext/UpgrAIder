@@ -1,0 +1,7 @@
+name: python-snippet-search
+version: 0.1.0
+extractor: python
+dependencies:
+  # This uses the latest version of the codeql/python-all library.
+  # You may want to change to a more precise semver string.
+  codeql/python-all: "*"

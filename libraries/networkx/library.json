@@ -1,0 +1,6 @@
+{
+    "name": "networkx",
+    "ghurl": "https://github.com/networkx/networkx",
+    "baseversion": "2.8.2",
+    "currentversion": "3.0"
+}

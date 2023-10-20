@@ -1,0 +1,6 @@
+{
+    "name": "numpy",
+    "ghurl": "https://github.com/numpy/numpy",
+    "baseversion": "v1.22.3",
+    "currentversion": "v1.24.2"
+}

@@ -1,0 +1,6 @@
+{
+    "name": "scipy",
+    "ghurl": "https://github.com/scipy/scipy",
+    "baseversion": "1.8.1",
+    "currentversion": "1.10.1"
+}

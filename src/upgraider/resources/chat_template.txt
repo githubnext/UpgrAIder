@@ -1,0 +1,18 @@
+Given the provided numbered reference information, decide if the provided code needs to be updated.
+Focus only on updates that do not change the code's functionality and are related to outdated, deprecated, or non-existent APIs.
+You must reply in the following exact numbered format.
+1. ```The full updated code snippet in a fenced code block``` or an empty fenced code block if you don't want to update the code
+2. Reason for update (if any)
+3. List of reference numbers used (if any) to update the code. If none of the references below were useful, say 'No references used'
+
+Provided code:
+
+```
+$original_code
+```
+
+Provided reference information:
+
+$references
+
+Your Response:

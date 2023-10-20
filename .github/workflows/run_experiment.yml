@@ -1,0 +1,211 @@
+name: Run Upgraider Experiment
+
+on:
+  workflow_dispatch:
+    inputs:
+      model:
+        description: "Model to use for fixing (gpt-3.5, gpt-4)"
+        type: string
+        default: "gpt-3.5"
+      useModelOnly:
+          description: "Run experiment with no external sources"
+          type: boolean
+          default: false
+      useDoc:
+        description: "Run experiment with references from Documentation/release notes"
+        type: boolean
+        default: true
+      compareTo:
+        description: "Run number of previous run to compare to (leave empty to skip comparison)"
+        default: ""
+      simthreshold:
+        description: "Similarity threshold for retrieval"
+        default: "0" # include all info
+      debug_enabled:
+        type: boolean
+        description: "Run the build with tmate debugging enabled (https://github.com/marketplace/actions/debugging-with-tmate)"
+        default: false
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      libraries: "${{ steps.parse_libraries.outputs.libraries }}"
+      model: "${{ github.event.inputs.model }}"
+      useModelOnly: "${{ github.event.inputs.useModelOnly || false }}"
+      useDoc: "${{ github.event.inputs.useDoc || true }}"
+      threshold: "${{ github.event.inputs.simthreshold || 0 }}"
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - run: |
+          pip install -r requirements.txt
+          python setup.py develop
+
+      - id: parse_libraries
+        run: |
+          libraries=$(python ${GITHUB_WORKSPACE}/src/benchmark/list_libraries.py)
+          echo "got libraries $libraries"
+          echo "libraries=$libraries" >> $GITHUB_OUTPUT
+
+  benchmark:
+    needs:
+      - setup
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        library: ${{ fromJson(needs.setup.outputs.libraries) }}
+    steps:      
+      - name: Checkout github repo (+ download lfs dependencies)
+        uses: actions/checkout@v3
+        with:
+          lfs: true
+
+      - name: Pull LFS objects
+        run: git lfs pull
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          python setup.py develop
+      
+      - name: Setup scratch venv
+        run: |
+          curr_dir=`pwd`
+          SCRATCH_VENV="$curr_dir/../scratchvenv"
+          echo "SCRATCH_VENV=$SCRATCH_VENV" >> $GITHUB_ENV
+          mkdir $SCRATCH_VENV
+          cd $SCRATCH_VENV
+          python -m venv .venv
+
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.debug_enabled }}
+
+      - name: Run example update with no sources
+        if: ${{ github.event.inputs.useModelOnly == 'true' }}
+        env:
+          OPENAI_API_KEY: "${{ secrets.OPENAI_API_KEY }}"
+          OPENAI_ORG: "${{ secrets.OPENAI_ORG }}"
+          GPT4_ENDPOINT: ${{ secrets.GPT4_ENDPOINT }}
+          GPT4_AUTH_HEADERS: ${{ secrets.GPT4_AUTH_HEADERS }}
+        run: |
+          library_name=${{ matrix.library.name }}
+          curr_dir=`pwd`
+          outputdir="$curr_dir/results/$library_name/modelonly"
+          mkdir -p $outputdir 
+          python src/upgraider/fix_lib_examples.py \
+            --libpath ${{ matrix.library.path }} \
+            --outputDir $outputdir \
+            --dbsource modelonly \
+            --threshold ${{ needs.setup.outputs.threshold }} \
+            --model ${{ needs.setup.outputs.model }} \
+
+      - name: Run example update with doc sources
+        if: ${{ needs.setup.outputs.useDoc == 'true' }}
+        env:
+          OPENAI_API_KEY: "${{ secrets.OPENAI_API_KEY }}"
+          OPENAI_ORG: "${{ secrets.OPENAI_ORG }}"
+          GPT4_ENDPOINT: ${{ secrets.GPT4_ENDPOINT }}
+          GPT4_AUTH_HEADERS: ${{ secrets.GPT4_AUTH_HEADERS }}
+        run: |
+          library_name=${{ matrix.library.name }}
+          curr_dir=`pwd`
+          outputdir="$curr_dir/results/$library_name/doc"
+          mkdir -p $outputdir 
+          python src/upgraider/fix_lib_examples.py \
+            --libpath ${{ matrix.library.path }} \
+            --outputDir $outputdir \
+            --dbsource doc \
+            --threshold ${{ needs.setup.outputs.threshold }} \
+            --model ${{ needs.setup.outputs.model }} \
+
+      - name: Zip up results
+        run: |
+          zip -r results.zip results
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: results-${{ matrix.library.name }}
+          path: "results.zip"
+
+  combine_output:
+    name: Combine output from all benchmarks
+    needs:
+      - benchmark
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download output zips
+        uses: actions/download-artifact@v3
+
+      - name: Combine output zips
+        run: |
+          mkdir results
+          for zip in results-*/results.zip
+          do
+            unzip -oq $zip
+          done
+          zip -r results.zip results
+      - name: Upload combined output files
+        uses: actions/upload-artifact@v3
+        with:
+          name: results-all
+          path: results.zip
+
+  generate-report:
+    needs:
+      - combine_output
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          python setup.py develop
+
+      - name: Download artifacts for this run
+        uses: actions/download-artifact@v3
+        with:
+          name: results-all
+          path: results
+      
+      - name: Download artifacts for comparison run
+        if: ${{ github.event.inputs.compareTo != '' }}
+        uses: dawidd6/action-download-artifact@v2
+        with:
+          run_number: ${{ github.event.inputs.compareTo }}
+          name: results-all
+          path: baseline
+
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.debug_enabled }}
+
+      - name: Generate report
+        run: |
+          cd results
+          unzip results.zip
+          cd ..
+          if [ -d baseline ]; then
+            cd baseline
+            unzip results.zip
+            cd .. 
+            python ${GITHUB_WORKSPACE}/src/benchmark/parse_reports.py --outputdir results/results --baselinedir baseline/results > $GITHUB_STEP_SUMMARY
+          else
+            python ${GITHUB_WORKSPACE}/src/benchmark/parse_reports.py --outputdir results/results > $GITHUB_STEP_SUMMARY
+          fi

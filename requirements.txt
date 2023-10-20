@@ -1,0 +1,12 @@
+pandas
+plotly
+markdownify
+openai==0.27.2
+sqlalchemy==2.0.4
+requests
+jsonpickle
+python-dotenv
+stackapi
+tiktoken
+dataclasses_json
+pytest

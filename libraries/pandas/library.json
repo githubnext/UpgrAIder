@@ -1,0 +1,6 @@
+{
+    "name": "pandas",
+    "ghurl": "https://github.com/pandas-dev/pandas/",
+    "baseversion": "v1.4.2",
+    "currentversion": "v2.0.0"
+}
