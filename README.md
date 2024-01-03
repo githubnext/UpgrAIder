@@ -1,6 +1,8 @@
-# UpgrAIder: Automatically Updating Deprecated API Usage through LLMs and documentation retrieval 
+# UpgrAIder
 
-The goal of this project is to update outdated code snippets (specifically those that use deprecated library APIs). The technique relies on the usage of a Large Language Model (hence the "AI" in the name), augmented with information retrieved from release notes. More details about the project can be found in [this presentation](https://github.com/githubnext/Upgraider/blob/main/Show-and-Tell/Nadi_ShowAndTell.pdf)
+UpgrAIder is a tool for automatically updating outdated code snippets (specifically those that use deprecated library APIs). The underlying technique relies on the usage of a Large Language Model (hence the "AI" in the name), augmented with information retrieved from release notes. More details about the project can be found in [this presentation](https://github.com/githubnext/Upgraider/blob/main/Show-and-Tell/Nadi_ShowAndTell.pdf).
+
+Note that UpgrAIder represents an early exploration of the above technique, and has been made available in open source as a basis for research and exploration.
 
 ## Setup
 
@@ -62,3 +64,16 @@ Experimental/not current used any more: To find differences between two versions
 `python src/apiexploration/run_api_diff.py`
 
 which will use the library version info in the `libraries` folders.
+
+# License
+
+This project is licenses under the terms of the MIT open source license. Pleare refer to [MIT](https://github.com/githubnext/UpgrAIder/blob/main/LICENSE) for the full terms.
+
+# Maintainers
+
+- Sarah Nadi (@snadi)
+- Max Schaefer (@max-schaefer)
+
+# Support
+
+UpgrAIder is a research prototype and is not officially supported. However, if you have questions or feedback, please file an issue and we will do our best to respond.
